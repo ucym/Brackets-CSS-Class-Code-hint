@@ -33,7 +33,7 @@ define(function (require, exports, module) {
         NativeFileSystem    = brackets.getModule("file/NativeFileSystem").NativeFileSystem;
 
     var instance_Cacher     = null,
-        elementLoader             =
+        elementLoader       =
             (function () {
                 var loader = document.createElement("iframe");
                 loader.setAttribute("href", "about:blank");
@@ -377,7 +377,7 @@ define(function (require, exports, module) {
             .resolveNativeFileSystemPath(
                 this.fullPath,
                 function (fileEntry) { self._fetch(deferred, fileEntry); },
-                function () { self.__onfail.apply(self, arguments); }
+                function () { self.__onfail(arguments); }
             );
         
         // on cache end invoke callback
@@ -484,9 +484,7 @@ define(function (require, exports, module) {
     /**
      * NativeFileSystem failed callback
      */
-    CSSCache.prototype.__onfail = function () {
-        console.error("File cache failed", arguments);
-    };
+    CSSCache.prototype.__onfail = function () {};
 ////////////////////////////////
     /**
      * @constructor
@@ -529,12 +527,7 @@ define(function (require, exports, module) {
             fileCache = new FileCache(document);
         
         // ドキュメントがキャッシュ済みで更新されていなければ更新停止
-        if (oldCache && fileCache.timestamp <= oldCache.timestamp) {
-            // console.log("Document already cached:", fullPath);
-            return;
-        }
-        
-        console.log("Document cache constructing...", fullPath);
+        if (oldCache && fileCache.timestamp <= oldCache.timestamp) { return;}
         
         // キャッシュを追加
         this._documentCaches[fullPath] = fileCache;
@@ -557,12 +550,7 @@ define(function (require, exports, module) {
             cssCache;
             
         cssCache = new CSSCache(path, function () {
-            if (oldCache && oldCache.timestamp >= cssCache.timestamp) {
-                // console.log("StyleSheet already cached:", path);
-                return;
-            }
-            
-            console.log("StyleSheet cache constructing...", path);
+            if (oldCache && oldCache.timestamp >= cssCache.timestamp) { return;}
             
             self._cssCaches[path] = cssCache;
         });
@@ -703,7 +691,7 @@ define(function (require, exports, module) {
     instance_Cacher = new Cacher();
     
 ////////////////////////////////
-    
+
     AppInit.appReady(function () {
         // Editor change listener
         instance_Cacher.__editorChange(EditorManager.getActiveEditor());
@@ -721,13 +709,8 @@ define(function (require, exports, module) {
             instance_Cacher.__fileSave(document);
         });
     });
+
 ////////////////////////////////
-    
-    /**
-     * @return {Cacher}
-     */
-    exports.getInstance = function () { return instance_Cacher; };
-    window.getCaches = exports.getInstance;
     
     return instance_Cacher;
 });

@@ -67,7 +67,6 @@ define(function (require, exports, module) {
      * @return {(Object + jQuery.Deferred)<hints: Array<(String + jQuery.Obj)>, match: String, selectInitial: Boolean>}
      */
     ClassHints.prototype.getHints = function () {
-        console.time("hint response");
         var tagInfo     = HTMLUtils.getTagInfo(this.editor, this.editor.getCursorPos()),
             tokenType   = tagInfo.position.tokenType,
             attrName    = tagInfo.attr.name.toLowerCase();
@@ -144,8 +143,6 @@ define(function (require, exports, module) {
         candidate.general.forEach(function (className) {
             result.push(highlight(className, "*"));
         });
-        
-        console.timeEnd("hint response");
         
         return {
             hints: result,

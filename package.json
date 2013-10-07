@@ -1,8 +1,8 @@
 {
     "name": "growlscript.brackets.classcompletion",
-    "title": "Brackets CSS Class Completion",
-    "description": "Simple Class & ID Completion",
-    "version": "0.1.1",
+    "title": "Brackets CSS Class Code hint",
+    "description": "Simple Class & ID code hint",
+    "version": "0.1.2",
     "author": "growlscript",
     "license": "MIT",
     "engines": {
