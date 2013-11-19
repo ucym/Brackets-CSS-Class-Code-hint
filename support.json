@@ -1,6 +1,6 @@
 {
     "htmlAttrs": {
-        "id":            {},
-        "class":         {}
+        "id":       true,
+        "class":    true
     }
 }

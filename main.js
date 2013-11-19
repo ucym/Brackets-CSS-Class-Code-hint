@@ -23,13 +23,14 @@ THE SOFTWARE.
 
 /*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true,  regexp: true, indent: 4, maxerr: 50 */
 /*global define, brackets, $, window, document */
+
 define(function (require, exports, module) {
     "use strict";
     
     var AppInit             = brackets.getModule("utils/AppInit"),
         CodeHintManager     = brackets.getModule("editor/CodeHintManager"),
         HTMLUtils           = brackets.getModule("language/HTMLUtils"),
-        Cacher              = require("cache");
+        Cacher              = require("Cache");
     
     var _supports            = JSON.parse(require("text!support.json")).htmlAttrs;
     
@@ -42,7 +43,7 @@ define(function (require, exports, module) {
     
     /**
      * @param {Editor} editor
-     * param {String} implicitChar
+     * @param {String} implicitChar
      *
      * @return {Boolean}
      */
@@ -96,28 +97,35 @@ define(function (require, exports, module) {
         var query       = [],
             ignore      = {},
             result      = [],
-            lastSpacePos = -1,
+            recentSpPos = -1,
             candidate,
             i;
         
         if (tagInfo.position.offset >= 0) {
-            // カーソル位置より前の最後のスペース位置
-            lastSpacePos = attrValue.lastIndexOf(" ", attrOffset) + 1;
+            // Decide ignore class names
+            $.each(attrValue.split(" "), function () { ignore[this] = true; });
             
-            // スペース以降の文字を取り出す
-            for (i = lastSpacePos; i < attrOffset; i++) {
-                if (attrValue[i] === " ") {break; }
-                query.push(attrValue[i]);
+            // Decide query
+            // find recent "space" position
+            for (i = attrOffset - 1; i >= 0; i--) {
+                if (attrValue[i] === " ") { i++; break; }
             }
+            recentSpPos = i === -1 ? 0 : i;
+            query = attrValue.slice(recentSpPos, attrOffset);
             
-            // 無視するクラス名を抽出
-            attrValue.substr(0, lastSpacePos - 1).split(" ").forEach(function (className) {
-                ignore[className] = true;
+            // Delete typing class name from ignore list.
+            i = 0;
+            $.each(ignore, function (key) {
+                i += (i > 1 ? 1 : 0) + key.length;
+                
+                if (i >= recentSpPos && key === query) {
+                    delete ignore[key];
+                    return false;
+                }
             });
         }
         
         // search
-        query = query.join("");
         candidate = Cacher.searchClass(this.editor.document, query, tagInfo.tagName, ignore);
         
         // override brackets highlight
@@ -137,12 +145,8 @@ define(function (require, exports, module) {
                 return objective;
             };
         
-        candidate.specific.forEach(function (className) {
-            result.push(highlight(className, tagInfo.tagName));
-        });
-        candidate.general.forEach(function (className) {
-            result.push(highlight(className, "*"));
-        });
+        $.each(candidate.specific, function () { result.push(highlight(this, tagInfo.tagName)); });
+        $.each(candidate.general, function () { result.push(highlight(this, "*")); });
         
         return {
             hints: result,
@@ -198,24 +202,37 @@ define(function (require, exports, module) {
      * @return {void}
      */
     ClassHints.prototype._insertClassHint = function (completion, cursor, tagInfo) {
-        var start       = {line: -1, ch: -1},
-            end         = {line: -1, ch: -1},
+        var start       = {line: cursor.line, ch: -1},
+            end         = {line: cursor.line, ch: -1},
+            
+            attrValue   = tagInfo.attr.value,
             attrOffset  = tagInfo.position.offset,
             attrStartPos = cursor.ch - attrOffset,
-            lastSpacePos = tagInfo.attr.value.lastIndexOf(" ", attrOffset),
-            quoteAppended = false;
+            quoteAppended = false,
+            lastSpPos,
+            i;
         
         completion = String(completion).match(/data\-class='(.+)'/)[1];
         
+        // find recent "space" position
+        for (i = attrOffset - 1; i >= 0; i--) {
+            if (attrValue[i] === " ") { i++; break; }
+        }
+        lastSpPos = i === -1 ? 0 : i;
+        
         // hasnt quote
-        if (tagInfo.attr.hasEndQuote === false && !tagInfo.attr.quateChar) {
-            completion = "\"" + completion + "\"";
+        if (tagInfo.attr.hasEndQuote === false) {
+            if (tagInfo.attr.quoteChar === "") {
+                completion = "\"" + completion + "\"";
+            } else {
+                completion = completion + tagInfo.attr.quoteChar;
+            }
+            
             quoteAppended = true;
         }
         
-        start.line = end.line = cursor.line;
-        start.ch = attrStartPos + lastSpacePos + 1; // attrPos + typed classes length
-        end.ch = start.ch + (cursor.ch - start.ch); // startPos + already typed
+        start.ch = attrStartPos + lastSpPos; // attrPos + typed classes length
+        end.ch = start.ch + (attrOffset - lastSpPos); // startPos + already typed
         
         if (start.ch === end.ch) {
             this.editor.document.replaceRange(completion, start);
@@ -234,13 +251,18 @@ define(function (require, exports, module) {
             quoteAppended = false;
         
         // hasnt quote
-        if (tagInfo.attr.hasEndQuote === false && !tagInfo.attr.quateChar) {
-            completion = "\"" + completion + "\"";
+        if (tagInfo.attr.hasEndQuote === false) {
+            if (tagInfo.attr.quoteChar === "") {
+                completion = "\"" + completion + "\"";
+            } else {
+                completion = completion + tagInfo.attr.quoteChar;
+            }
+            
             quoteAppended = true;
         }
         
         start.line = end.line = cursor.line;
-        start.ch = attrStartPos; // attrPos + typed classes length
+        start.ch = attrStartPos; // attrStartPos
         end.ch = start.ch + (cursor.ch - start.ch); // startPos + already typed
         
         if (start.ch === end.ch) {
@@ -252,7 +274,7 @@ define(function (require, exports, module) {
         this.editor.setCursorPos(start.line, start.ch + completion.length - quoteAppended);
     };
     
-    
+    // Register code hinter
     AppInit.appReady(function () {
         var classHints = new ClassHints();
         CodeHintManager.registerHintProvider(classHints, ["html"], 5);

@@ -25,495 +25,52 @@ THE SOFTWARE.
 define(function (require, exports, module) {
     "use strict";
 
-    var AppInit             = brackets.getModule("utils/AppInit"),
-        FileUtils           = brackets.getModule("file/FileUtils"),
-        ProjectManager      = brackets.getModule("project/ProjectManager"),
-        EditorManager       = brackets.getModule("editor/EditorManager"),
-        DocumentManager     = brackets.getModule("document/DocumentManager"),
-        NativeFileSystem    = brackets.getModule("file/NativeFileSystem").NativeFileSystem;
+    var CSSCache        = require("CSSCache"),
+        Directory       = brackets.getModule("filesystem/Directory"),
+        DocumentManager = brackets.getModule("document/DocumentManager"),
+        EditorManager   = brackets.getModule("editor/EditorManager"),
+        FileSystem      = brackets.getModule("filesystem/FileSystem"),
+        File            = brackets.getModule("filesystem/File"),
+        HTMLCache       = require("HTMLCache"),
+        ProjectManager  = brackets.getModule("project/ProjectManager");
+    
+    var _instance      = null;
 
-    var instance_Cacher     = null,
-        elementLoader       =
-            (function () {
-                var loader = document.createElement("iframe");
-                loader.setAttribute("href", "about:blank");
-                loader.style.display = "none";
-                document.body.appendChild(loader);
-                
-                return loader.contentDocument.head;
-            })();
-
-////////////////////////////////
-    
-    /**
-     * Collection of class name & id
-     * @constructor
-     */
-    function StyleCache() {
-        this._classes = {
-            // tagName: ['classes', 'classes'....]
-        };
-        
-        this._ids = [];
-    }
-    
-    /**
-     * Add cache from CSSRuleList parse result
-     *
-     * @param {CSSRuleList} rules
-     */
-    StyleCache.prototype.parseStyleRule = function (rules) {
-        var self = this;
-
-        // filter no style rules
-        var styleRules;
-        styleRules = Array.prototype.filter.call(rules, function (rule) {
-            return rule.type === CSSStyleRule.prototype.STYLE_RULE;
-        });
-
-        // separate comma
-        var commaSeparated = [];
-        $.each(styleRules, function (i, rule) {
-            commaSeparated.push.apply(commaSeparated, rule.selectorText.split(","));
-        });
-        styleRules = null;
-
-        // sepalate space
-        var spaceSeparated = [];
-        $.each(commaSeparated, function (i, selector) {
-            spaceSeparated.push.apply(spaceSeparated, selector.split(" "));
-        });
-        commaSeparated = null;
-
-        // caching
-        var splited, tagName, classNames;
-        $.each(spaceSeparated, function (i, selector) {
-            if (selector === "") {return; }
-
-            // 擬似要素、擬似クラス、子孫セレクタを削除
-            selector = selector.replace(/::?.+/g, "").replace(/\[.+\]/g, "").replace(/[>+]/g, "");
-            // タグ名とクラス名を分離
-            splited = selector.split(".");
-            tagName = splited.shift();
-            classNames = splited;
-            
-            // タグ名がIDならID候補を追加
-            if (tagName[0] === "#") {
-                self.addId(tagName.substr(1));
-            }
-            
-            // クラス名が残っていれば, クラスを追加
-            if (classNames.length) {
-                tagName = tagName === "*" ? "" : tagName || "";
-                
-                classNames.forEach(function (className) {
-                    self.addClass(className, tagName);
-                });
-            }
-        });
-    };
-    
-    /**
-     * @param {String} className
-     * @param {?String} tagName
-     */
-    StyleCache.prototype.addClass = function (className, tagName) {
-        tagName = !tagName ? "" : tagName;
-        
-        // 配列を初期化する
-        this._classes[tagName] = this._classes[tagName] || [];
-        
-        if (this._classes[tagName].length === 0 || this._classes[tagName].indexOf(className) === -1) {
-            this._classes[tagName].push(className);
-        }
-    };
-    
-    /**
-     * add id candidate
-     *
-     * @param {String} idName
-     */
-    StyleCache.prototype.addId = function (idName) {
-        this._ids.push(idName);
-    };
-    
-    /**
-     * search query matched class
-     *
-     * @param {String} query
-     * @param {String} tagName
-     * @param {?{className:Boolean}} ignore
-     * @return {Array.<String>}
-     */
-    StyleCache.prototype.searchClass = function (query, tagName, ignore) {
-        var matcher = new RegExp(query),
-            result  = [];
-        ignore = ignore || {};
-        
-        if (!this._classes[tagName]) { return result; }
-        
-        this._classes[tagName].forEach(function (className) {
-            if (ignore[className] !== true && className.match(query)) { result.push(className); }
-        });
-        
-        return result;
-    };
-    
-    /**
-     * Search query matched id
-     *
-     * @param {String} query
-     * @return {Array.<String>}
-     */
-    StyleCache.prototype.searchId = function (query) {
-        var matcher = new RegExp(query),
-            result  = [];
-        
-        this._ids.forEach(function (id) {
-            if (id.match(query)) { result.push(id); }
-        });
-        
-        return result;
-    };
-    
-    /**
-     * Dispose object
-     */
-    StyleCache.prototype.dispose = function () {
-        this._classes = null;
-        this._ids = null;
-    };
-////////////////////////////////
-    /**
-     * @constructor
-     * @param {Document}
-     */
-    function FileCache(document) {
-        // private
-        Object.defineProperty(this, "_document", {
-            value: document,
-            writable: false
-        });
-        
-        this._styleCache = new StyleCache();
-        
-        //public
-        Object.defineProperty(this, "fullPath", {
-            value: document.file.fullPath,
-            writable: false
-        });
-        Object.defineProperty(this, "timestamp", {
-            value: document.diskTimestamp,
-            writable: false
-        });
-        
-        this._dependentFilesCache = null;
-        
-        // スタイル要素のキャッシュを作成する
-        this._createStyleCache();
-    }
-    
-    /***
-     * FileCache properties
-     ***/
-    // private
-    FileCache.prototype._document       = null;
-    FileCache.prototype._styleCache     = null;
-    FileCache.prototype._dependentFilesCache = null;
-    
-    // public
-    FileCache.prototype.fullPath    = null;
-    FileCache.prototype.timestamp   = null;
-    
-    /**
-     * fix relative url
-     * @param {String} url
-     */
-    function _parseUrl(url) {
-        var stack = [];
-        url.split("/").forEach(function (v, i) {
-            if (v === "..") {
-                stack.pop();
-            } else if (v !== ".") {
-                stack.push(v);
-            }
-        });
-        
-        return stack.join("/");
-    }
-    
-    /***
-     * FileCache private methods
-     * 
-     ***/
-    /**
-     * Construct style cache
-     *
-     * @param {Function} callback
-     */
-    FileCache.prototype._createStyleCache = function (callback) {
-        var self        = this,
-            document    = this.getText(),
-            styles      = document.match(/<style>[\s\S]*?<\/style>/gi) || [];
-        
-        // style要素がなければ終了
-        if (!styles.length) {return; }
-        
-        styles = $.parseHTML(styles.join(""));
-        styles.forEach(function (style, index) {
-            var deferred = $.Deferred();
-            
-            // load style
-            style.addEventListener("load", function () { deferred.resolve(); }, false);
-            elementLoader.appendChild(style);
-            
-            deferred.done(function () {
-                self._styleCache.parseStyleRule(style.sheet.rules);
-                
-                style.remove();
-                style = null;
-                
-                if (index === styles.length - 1 && typeof callback === "function") {
-                    callback();
-                }
-            });
-        });
-    };
-    
-    /***
-     * FileCache Public Methods
-     *
-     ***/
-    /**
-     * get contents as text
-     * ファイル内のテキストを取得します。
-     *
-     * @return {String}
-     */
-    FileCache.prototype.getText = function () {
-        return this._document.getText();
-    };
-    
-    /**
-     * Get dependence files absolute path
-     * 依存ファイル(CSS)を絶対パスで取得します。
-     *
-     * @return {Array.<String>}
-     */
-    FileCache.prototype.getDependenceFiles = function () {
-        if (this._dependentFilesCache) {return this._dependentFilesCache; }
-        
-        // キャッシュがなかったら構築
-        var projectRoot = ProjectManager.getProjectRoot().fullPath,
-            docRoot  = this.fullPath.substr(0, this.fullPath.lastIndexOf("/") + 1),
-            depends = [],
-            links   = this.getText().match(/<link .*[ ]?href=["|'](.+)["|'].*>/g) || [];
-        
-        // ファイル内から抽出したLink要素から絶対パスを推測
-        links.forEach(function (link) {
-            var path = _parseUrl(link.match(/href=['"](.+?)['"]/)[1]);
-            path = path[0] === "/" ? projectRoot + path : docRoot + path;
-            depends.push(path);
-        });
-        
-        // 依存ファイルキャッシュを作成
-        this._dependentFilesCache = depends;
-        
-        return this._dependentFilesCache;
-    };
-    
-    /**
-     * search query matched class
-     *
-     * @param {String} query
-     * @param {String} tagName
-     * @param {?{className:Boolean}} ignore
-     * @return {Array.<String>}
-     */
-    FileCache.prototype.searchClass = function (query, tagName, ignore) {
-        return this._styleCache.searchClass(query, tagName, ignore);
-    };
-    
-    /**
-     * Search query matched id
-     *
-     * @param {String} query
-     * @return {Array.<String>}
-     */
-    FileCache.prototype.searchId = function (query) {
-        return this._styleCache.searchId(query);
-    };
-    
-    /**
-     * Dispose object
-     *
-     * @return {void}
-     */
-    FileCache.prototype.dispose = function () {
-        this._dependentFilesCache = null;
-    };
-////////////////////////////////
-    
-    /**
-     * @constructor
-     * @param {String} path  css file path
-     */
-    function CSSCache(path, callback) {
-        var self        = this,
-            deferred    = $.Deferred();
-        
-        // public
-        this.deferred = deferred.promise();
-        Object.defineProperty(this, "fullPath", {
-            value: path,
-            writable: false
-        });
-        
-        // private
-        this._styleCache = new StyleCache();
-        
-        // Loading file
-        NativeFileSystem
-            .resolveNativeFileSystemPath(
-                this.fullPath,
-                function (fileEntry) { self._fetch(deferred, fileEntry); },
-                function () { self.__onfail(arguments); }
-            );
-        
-        // on cache end invoke callback
-        deferred.done(function () {
-            if (typeof callback === "function") { callback.apply(self); }
-        });
-    }
-    
-    // private property
-    CSSCache.prototype._classes = null;
-    CSSCache.prototype._ids = null;
-    
-    // public property
-    CSSCache.prototype.fullPath     = null;
-    CSSCache.prototype.timestamp    = null;
-    CSSCache.prototype.deferred     = null;
-    
-    // private static property
-    CSSCache._loader = elementLoader;
-    
-    /***
-     * CSSCache private method
-     *
-     ***/
-    /**
-     * Load CSS and Cache
-     * @private
-     * @param {$.Deferred} deferred
-     * @param {FileEntry} file
-     */
-    CSSCache.prototype._fetch = function (deferred, file) {
-        var self    = this,
-            style   = null,
-            onload  = $.Deferred();
-        
-        // Get last update date
-        file.getMetadata(function (meta) {
-            Object.defineProperty(self, "timestamp", {value: meta.modificationTime, writable: false});
-        });
-        
-        // Read file contents
-        FileUtils
-            .readAsText(file)
-            .done(function (content) {
-                style = document.createElement("style");
-                style.innerHTML = content;
-                style.addEventListener("load", function () { onload.resolve(); });
-                CSSCache._loader.appendChild(style);
-            });
-        
-        // End read file then cache style rules
-        onload.done(function () {
-            // スタイルルールからキャッシュを作成
-            self._styleCache.parseStyleRule(style.sheet.rules);
-            
-            // clear dom element
-            style.remove();
-            style = null;
-            
-            // CSSCache onload
-            deferred.resolve();
-        });
-    };
-    
-    /***
-     * CSSCache public method
-     *
-     ***/
-    /**
-     * search query matched class
-     *
-     * @param {String} query
-     * @param {String} tagName
-     * @param {?{className:Boolean}} ignore
-     * @return {Array.<String>}
-     */
-    CSSCache.prototype.searchClass = function (query, tagName, ignore) {
-        return this._styleCache.searchClass(query, tagName, ignore);
-    };
-    
-    /**
-     * Search query matched id
-     *
-     * @param {String} query
-     * @return {Array.<String>}
-     */
-    CSSCache.prototype.searchId = function (query) {
-        return this._styleCache.searchId(query);
-    };
-    
-    /**
-     * Dispose object
-     */
-    CSSCache.prototype.dispose = function () {
-        this.deferred   = null;
-        this._styleCache.dispose();
-        this._styleCache = null;
-    };
-    
-    /***
-     * CSSCache listener method
-     *
-     ***/
-    /**
-     * NativeFileSystem failed callback
-     */
-    CSSCache.prototype.__onfail = function () {};
-////////////////////////////////
     /**
      * @constructor
      */
     function Cacher() {
-        instance_Cacher = this;
         this._initialize();
     }
     
-    /***
-     * Cacher private method
-     *
-     ***/
     /**
-     * キャッシュの初期化など
+     * HTMLCache list.
+     * 
+     * @type {Object.<string, HTMLCache>} {"fullFilePath": HTMLCache Object ...}
+     */
+    Cacher.prototype._HTMLCaches    = null;
+    
+    /**
+     * CSSCache list
+     *
+     * @type {Object.<string, CSSCache>} {"fullFilePAth": CSSCache Object...}
+     */
+    Cacher.prototype._CSSCaches     = null;
+    
+    /**
+     * Dispose and initialize cache.
      */
     Cacher.prototype._initialize = function () {
-        if (this._cssCaches) {
-            $.each(this._cssCaches, function (path) { this.dispose(); });
+        if (this._CSSCaches) {
+            $.each(this._CSSCaches, function () { this.dispose(); });
         }
         
-        if (this._documentCaches) {
-            $.each(this._documentCaches, function () { this.dispose(); });
+        if (this._HTMLCaches) {
+            $.each(this._HTMLCaches, function () { this.dispose(); });
         }
         
-        // HTMLファイルのキャッシュ
-        this._documentCaches = {};
-        // CSSファイルのキャッシュ
-        this._cssCaches = {};
+        this._HTMLCaches = {};
+        this._CSSCaches = {};
     };
     
     /**
@@ -522,93 +79,79 @@ define(function (require, exports, module) {
      * @param {Document} document
      */
     Cacher.prototype._addDocumentCache = function (document) {
-        var fullPath    = document.file.fullPath,
-            oldCache    = this._documentCaches[fullPath],
-            fileCache = new FileCache(document);
+        var htmlCache = new HTMLCache(document);
         
-        // ドキュメントがキャッシュ済みで更新されていなければ更新停止
-        if (oldCache && fileCache.timestamp <= oldCache.timestamp) { return;}
+        // Add Cache
+        this._HTMLCaches[htmlCache.fullPath] = htmlCache;
         
-        // キャッシュを追加
-        this._documentCaches[fullPath] = fileCache;
-        
-        // 依存ファイル(CSS)をキャッシュ
-        var self     = this,
-            depends  = fileCache.getDependenceFiles();
-        depends.forEach(function (path) {
-            self._addCSSCache(path);
-        });
+        // fetch dependent files
+        $.each(htmlCache.depends, this._addCSSCache.bind(this));
     };
     
     /**
      * Cache css file
-     * @param {String} path  fullPath
+     * @param {String|Array.<File>} path fullPath
      */
     Cacher.prototype._addCSSCache = function (path) {
-        var self = this,
-            oldCache = this._cssCaches[path],
-            cssCache;
-            
-        cssCache = new CSSCache(path, function () {
-            if (oldCache && oldCache.timestamp >= cssCache.timestamp) { return;}
-            
-            self._cssCaches[path] = cssCache;
-        });
+        var self = this;
+        
+        if (typeof path === "string") {
+            FileSystem.resolve(path, function (err, entry) {
+                if (typeof err === "string") {
+                    console.error("File read error: " + err, path);
+                }
+                self._CSSCaches[path] = new CSSCache(entry);
+            });
+        } else if (path instanceof Array) {
+            $.each(path, function () {
+                if (this instanceof File) {
+                    self._CSSCaches[this.fullPath] = new CSSCache(this);
+                }
+            });
+        }
     };
     
-    /***
-     * Cacher public method
-     *
-     ***/
     /**
-     * 依存ファイルとクエリに一致するクラス名一覧を取得します
+     * Search the class name associated with the HTML from all cache.
      *
      * @param {Document} document
-     * @param {String} query
-     * @param {String} tagName
-     * @param {?{className:Boolean}} ignore
-     * @return {{specific:Array.<String>, general:Array.<String>}}
+     * @param {string} query
+     * @param {string} tagName
+     * @param {?Object,<string, boolean>} ignore
+     * @return {{specific:Array.<string>, general:Array.<string>}}
      */
     Cacher.prototype.searchClass = function (document, query, tagName, ignore) {
-        var self        = this,
-            filePath    = document.file.fullPath,
-            depends     = null,
+        var Arr         = Array.prototype,
+            self        = this,
+            htmlCache   = this._HTMLCaches[document.file.fullPath],
+            depends     = htmlCache && htmlCache.depends,
             candidates  = {specific: [], general: []},
-            matches     = [];
+            targets     = [];
         
         tagName = !tagName ? "" : tagName;
         ignore = ignore || {};
         
-        // HTMLの依存ファイルを抽出する
-        if (this._documentCaches[filePath]) {
-            depends = this._documentCaches[filePath].getDependenceFiles();
-        } else {
-            // 依存ファイルが取れなかったらとりあえずキャッシュ済みの全ファイルを対象
-            depends = [];
-            $.each(this._cssCaches, function (filePath) {
-                depends.push(filePath);
-            });
+        if (!depends || depends.length === 0) {
+            // if dependent files doesn't listed, search all css in projects.
+            depends = $.map(this._CSSCaches, function (obj, key) { return key; });
         }
         
-        // HTML内のstyle要素から検索
-        if (self._documentCaches[filePath]) {
-            // 要素非依存のクラスを検索
-            Array.prototype.push.apply(candidates.general, self._documentCaches[filePath].searchClass(query, "", ignore));
-            
-            // 要素依存のクラスを検索
-            if (tagName !== "") {
-                Array.prototype.push.apply(candidates.specific, self._documentCaches[filePath].searchClass(query, tagName, ignore));
-            }
-        }
+        // Add current HTML to search que.
+        if (!!htmlCache) { targets.push(htmlCache); }
         
-        // キャッシュから候補を検索
-        $.each(depends, function (index, filePath) {
-            // 要素非依存のクラスを検索
-            Array.prototype.push.apply(candidates.general, self._cssCaches[filePath].searchClass(query, "", ignore));
+        // Add dependent CSS to search que.
+        Arr.push.apply(
+            targets,
+            $.map(depends, function (filePath) { return self._CSSCaches[filePath] || null; })
+        );
+        
+        $.each(targets, function () {
+            // Search tag independent classes
+            Arr.push.apply(candidates.general, this.searchClass(query, "", ignore));
             
-            // 要素依存のクラスを検索
+            // Search tag depenednt classes
             if (tagName !== "") {
-                Array.prototype.push.apply(candidates.specific, self._cssCaches[filePath].searchClass(query, tagName, ignore));
+                Arr.push.apply(candidates.specific, this.searchClass(query, tagName, ignore));
             }
         });
         
@@ -616,101 +159,113 @@ define(function (require, exports, module) {
     };
     
     /**
+     * Search the id associated with theHTML from all caches.
+     *
      * @param {Document} document
      * @param {String} query
      */
     Cacher.prototype.searchId = function (document, query) {
-        var self        = this,
-            filePath    = document.file.fullPath,
-            depends     = null,
+        var Arr         = Array.prototype,
+            self        = this,
+            htmlCache   = this._HTMLCaches[document.file.fullPath],
+            depends     = htmlCache && htmlCache.depends,
+            targets     = [],
             matches     = [];
         
-        // HTMLの依存ファイルを抽出する
-        if (this._documentCaches[filePath]) {
-            depends = this._documentCaches[filePath].getDependenceFiles();
-        } else {
-            // 依存ファイルが取れなかったらキャッシュ済みの全ファイルを対象
-            depends = [];
-            $.each(this._cssCaches, function (filePath) {
-                depends.push(filePath);
-            });
+        if (!depends || depends.length === 0) {
+            // if dependent files doesn't listed, search all css in projects.
+            depends = $.map(this._CSSCaches, function (obj, key) { return key; });
         }
         
-        // HTML内のstyle要素から検索
-        if (self._documentCaches[filePath]) {
-            Array.prototype.push.apply(matches, self._documentCaches[filePath].searchId(query));
-        }
+        // Add current HTML to search que.
+        if (!!htmlCache) { targets.push(htmlCache); }// Arr.push.apply(matches, htmlCache.searchId(query)); }
         
-        // キャッシュから候補を検索
-        $.each(depends, function (index, filePath) {
-            Array.prototype.push.apply(matches, self._cssCaches[filePath].searchId(query));
+        // Add dependent CSS to search que.
+        Arr.push.apply(
+            targets,
+            $.map(depends, function (filePath) { return self._CSSCaches[filePath] || null; })
+        );
+        
+        // Search id's
+        $.each(targets, function () {
+            Arr.push.apply(matches, this.searchId(query));
         });
         
         return matches;
     };
     
-    /***
-     * Cacher event listeners
-     *
-     ***/
     /**
-     * Editor change event listener
-     * ファイルが開かれた時に、ファイル内容を解析してキャッシュを行う
+     * Project open event listener
+     */
+    Cacher.prototype.__projectOpen = function () {
+        var self            = this,
+            prjDirectory    = ProjectManager.getProjectRoot();
+        
+        /**
+         * Search css file from directory
+         * @param {Directory} dir
+         */
+        function pickCssFromDirEntry(dir) {
+            var defer       = $.Deferred(),
+                dirSearcher = [],
+                pickedCSS   = [];
+            
+            
+            dir.getContents(function (result, entries) {
+                
+                $.each(entries, function () {
+                    if (this instanceof Directory) {
+                        dirSearcher.push(pickCssFromDirEntry(this));
+                    } else if (this instanceof File && !!this.name.match(/.+\.css$/)) {
+                        // if file is css, add CSS file list
+                        pickedCSS.push(this);
+                    }
+                });
+                
+                // All deferred task completed
+                $.when.apply($, dirSearcher)
+                    .done(function () {
+                        $.each(arguments, function () { pickedCSS.push(this); });
+                        defer.resolve(pickedCSS);
+                    });
+            });
+
+            return defer.promise();
+        }
+        
+        // Search css file from Project directory
+        pickCssFromDirEntry(prjDirectory)
+            .done(function (entries) {
+                // cache CSS
+                $.each(entries, function () { self._addCSSCache(entries); });
+            });
+    };
+    
+    /**
+     * When a editor is opened, to cache by parsing the file contents.
      *
-     * @param {Editor} editor  active editor
+     * @param {Editor} editor Active editor
      */
     Cacher.prototype.__editorChange = function (editor) {
-        if (!editor) {return; }
-        if (editor.getModeForSelection() !== "html") {return; }
+        if (!editor || editor.getModeForSelection() !== "html") { return; }
         
-        // ドキュメントをキャッシュに追加する
         this._addDocumentCache(editor.document);
     };
     
-    /**
-     * File save event listener
-     * ファイルの再キャッシュを行います。
-     *
-     * @param {Document} document
-     */
-    Cacher.prototype.__fileSave = function (document) {
-        if (!document) {return; }
-        
-        // Cache reconstruct
-        if (document._masterEditor.getModeForSelection() === "html") {
-            this._addDocumentCache(document);
-        }
-        
-        // 
-        if (document._masterEditor.getModeForSelection() === "css") {
-            this._addCSSCache(document.file.fullPath);
-        }
-    };
-    
     // construct
-    instance_Cacher = new Cacher();
+    _instance = new Cacher();
     
-////////////////////////////////
-
-    AppInit.appReady(function () {
-        // Editor change listener
-        instance_Cacher.__editorChange(EditorManager.getActiveEditor());
-        $(EditorManager).on("activeEditorChange", function () {
-            instance_Cacher.__editorChange(this.getActiveEditor());
-        });
-        
-        // Project change listener
-        $(ProjectManager).on("projectOpen", function () {
-            instance_Cacher._initialize();
-        });
-        
-        // File save listener
-        $(DocumentManager).on("documentSaved", function (event, document) {
-            instance_Cacher.__fileSave(document);
-        });
+    // Listen editor change event for HTMLParse and Caching.
+    _instance.__editorChange(EditorManager.getActiveEditor());
+    $(EditorManager).on("activeEditorChange", function () {
+        _instance.__editorChange(this.getActiveEditor());
     });
-
-////////////////////////////////
     
-    return instance_Cacher;
+    // Listen projectOpen event for Initialize cache and precache css.
+    $(ProjectManager).on("projectOpen projectRefresh", function () {
+        _instance._initialize();
+        _instance.__projectOpen();
+    });
+    
+    return _instance;
 });
