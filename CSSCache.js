@@ -48,7 +48,7 @@ define(function (require, exports, module) {
         var cssCache = _instances[doc.file.fullPath];
         
         if (!!cssCache && cssCache === doc && cssCache.isDisposed === false) {
-            cssCache.fetch();
+            cssCache._fetch();
         }
     }
     
@@ -78,7 +78,7 @@ define(function (require, exports, module) {
         if (!!_instances[file.fullPath]) {
             var self = _instances[file.fullPath];
             self.dispose();
-            self.fetch();
+            self._fetch();
             
             return _instances[file.fullPath];
         }
