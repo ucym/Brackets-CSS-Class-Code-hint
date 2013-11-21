@@ -30,7 +30,7 @@ define(function (require, exports, module) {
         FileUtils       = brackets.getModule("file/FileUtils"),
         StyleRuleCache  = require("StyleRuleCache");
     
-    var CHECK_INTERVAL  = 1000;
+    var CHECK_INTERVAL  = 20000;
     
     /**
      * @private
@@ -64,8 +64,6 @@ define(function (require, exports, module) {
             if (date - this.lastUpdateCheck.getTime() >= CHECK_INTERVAL) {
                 this.clearCache();
                 this._fetch();
-                
-                return false;
             }
         });
     }
