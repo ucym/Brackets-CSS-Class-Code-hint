@@ -48,7 +48,7 @@ define(function (require, exports, module) {
         var cssCache = _instances[doc.file.fullPath];
         
         if (!!cssCache && cssCache === doc && cssCache.isDisposed === false) {
-            cssCache._fetch();
+            cssCache.fetch();
         }
     }
     
@@ -61,7 +61,7 @@ define(function (require, exports, module) {
         var date = Date.now();
         
         $.each(_instances, function () {
-            if (date - this.lastUpdateCheck.getTime() >= CHECK_INTERVAL) {
+            if (date - this.lastUpdateCheck >= CHECK_INTERVAL) {
                 this.clearCache();
                 this._fetch();
             }
@@ -77,7 +77,6 @@ define(function (require, exports, module) {
     function CSSCache(file) {
         if (!!_instances[file.fullPath]) {
             var self = _instances[file.fullPath];
-            self.dispose();
             self._fetch();
             
             return _instances[file.fullPath];

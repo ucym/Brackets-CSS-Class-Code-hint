@@ -74,6 +74,9 @@ define(function (require, exports, module) {
      * @constructor
      *
      * HTML cache for inner Style elements and dependencies.
+     * Events
+     *      fetch - Fire on document fetched.
+     *
      * @param {Document} document
      */
     function HTMLCache(document) {
@@ -134,13 +137,19 @@ define(function (require, exports, module) {
             docRoot     = this.fullPath.substr(0, this.fullPath.lastIndexOf("/") + 1),
             depends     = [],
             links       = this._getText().match(/<link .*[ ]?href=["|'](.+)["|'].*>/g) || [];
-
+        
         $.each(links, function () {
-            var path = this.match(/href=['"](.+?)['"]/)[1];
+            var link = $.parseHTML(this)[0],
+                path;
 
-            path = path[0] === "/" ? projectRoot + path : docRoot + path;
-            path = _resolvePath(path);
-            depends.push(path);
+            if (link.href.slice(-3).toLowerCase() === "css") {
+                path = link.getAttribute("href");
+
+                // when reference root, rewrite to ProjectRoot path
+                path = path[0] === "/" ? projectRoot + path : docRoot + path;
+                path = _resolvePath(path);
+                depends.push(path);
+            }
         });
 
         this._deps = depends;
@@ -151,7 +160,7 @@ define(function (require, exports, module) {
      *
      * Construct cache.
      */
-    HTMLCache.prototype._fetch = function () {
+    HTMLCache.prototype._fetchRules = function () {
         var self        = this,
             document    = this._getText(),
             styles      = document.match(/<style ?.*>[\s\S]*?<\/style>/gi) || [];
@@ -168,6 +177,8 @@ define(function (require, exports, module) {
             deferred.done(function (element) {
                 self.parseStyleRule(style.sheet.rules, style);
                 element.remove();
+                
+                $(self).triggerHandler("ruleFetched");
             });
         });
     };
@@ -186,10 +197,14 @@ define(function (require, exports, module) {
      * Fetch and parse HTML Content
      */
     HTMLCache.prototype.fetch = function () {
+        var self = this;
+        
+        $(this).one("ruleFetched", function () { $(self).triggerHandler("fetch"); });
+        
         this.clearCache();
         
         this._surveyDependent();
-        this._fetch();
+        this._fetchRules();
     };
     
     /**

@@ -79,13 +79,20 @@ define(function (require, exports, module) {
      * @param {Document} document
      */
     Cacher.prototype._addDocumentCache = function (document) {
-        var htmlCache = new HTMLCache(document);
+        var self        = this,
+            htmlCache   = new HTMLCache(document);
         
         // Add Cache
         this._HTMLCaches[htmlCache.fullPath] = htmlCache;
         
+        $(htmlCache).on("fetch", function () {
+            $.each(this.depends, function () { self._addCSSCache(this); });
+        });
+        
         // fetch dependent files
-        $.each(htmlCache.depends, this._addCSSCache.bind(this));
+        $.each(htmlCache.depends, function () {
+            self._addCSSCache(this);
+        });
     };
     
     /**
@@ -174,7 +181,7 @@ define(function (require, exports, module) {
         
         if (!depends || depends.length === 0) {
             // if dependent files doesn't listed, search all css in projects.
-            depends = $.map(this._CSSCaches, function (obj, key) { return key; });
+            //depends = $.map(this._CSSCaches, function (obj, key) { return key; });
         }
         
         // Add current HTML to search que.

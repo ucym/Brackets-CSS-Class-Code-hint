@@ -27,10 +27,10 @@ THE SOFTWARE.
 define(function (require, exports, module) {
     "use strict";
     
-    var AppInit             = brackets.getModule("utils/AppInit"),
-        CodeHintManager     = brackets.getModule("editor/CodeHintManager"),
-        HTMLUtils           = brackets.getModule("language/HTMLUtils"),
-        Cacher              = require("Cache");
+    var AppInit         = brackets.getModule("utils/AppInit"),
+        CodeHintManager = brackets.getModule("editor/CodeHintManager"),
+        HTMLUtils       = brackets.getModule("language/HTMLUtils"),
+        Cacher          = require("Cache");
     
     var _supports            = JSON.parse(require("text!support.json")).htmlAttrs;
     
@@ -132,17 +132,9 @@ define(function (require, exports, module) {
         var queryMathcer    = new RegExp("(" + query + ")", "i"),
             template        = "<span style='color:#a7a7a7;' data-element=':element:' data-class=':class:'>:element:.</span>:matchedclass:",
             highlight       = function (className, tagName) {
-                var str, objective;
-                
-                str = template
+                return template
                         .replace(/:element:/g, tagName).replace(/:class:/g, className)
                         .replace(/:matchedclass:/g, className.replace(queryMathcer, "<b>$1</b>"));
-                
-                objective = Object.apply(str);
-                objective.toString = function () { return str; };
-                objective.replace = function () {};
-                
-                return objective;
             };
         
         $.each(candidate.specific, function () { result.push(highlight(this, tagInfo.tagName)); });
@@ -150,7 +142,7 @@ define(function (require, exports, module) {
         
         return {
             hints: result,
-            query: query,
+            //query: query,
             selectInitial: true
         };
     };
