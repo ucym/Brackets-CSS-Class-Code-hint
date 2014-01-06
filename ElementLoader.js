@@ -21,7 +21,7 @@ THE SOFTWARE.
 */
 
 /*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true,  regexp: true, indent: 4, maxerr: 50 */
-/*global define, brackets, $, document */
+/*global define, $, document */
 define(function (require, exports, module) {
     "use strict";
     
@@ -47,19 +47,18 @@ define(function (require, exports, module) {
      * @param {HTMLElement} element
      * @param {function(event)} callback
      */
-    ElementLoader.prototype.load = function (element, callback) {
+    ElementLoader.prototype.load = function (element) {
+        var dfd = $.Deferred();
+        
         if (typeof element === "string") {
             element = $.parseHTML(element);
         }
         
-        $(element).load(callback).appendTo(this._loader);
-    };
-    
-    /**
-     * @param {HTMLElement}
-     */
-    ElementLoader.prototype.unload = function (element) {
-        element.remove();
+        $(element)
+            .load(function () { dfd.resolve(element); })
+            .appendTo(this._loader);
+        
+        return dfd.promise();
     };
     
     return new ElementLoader();

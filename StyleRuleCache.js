@@ -21,7 +21,7 @@ THE SOFTWARE.
 */
 
 /*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true,  regexp: true, indent: 4, maxerr: 50 */
-/*global define, brackets, $, document, CSSStyleRule */
+/*global define, $, CSSStyleRule */
 define(function (require, exports, module) {
     "use strict";
     
@@ -43,13 +43,13 @@ define(function (require, exports, module) {
     });
     
     /**
-     * Included class names.
+     * Class names.
      * @type {Object.<String, Array.<String>>}
      */
     StyleRuleCache.prototype._class = null;
     
     /**
-     * Included id's.
+     * Id's.
      * @type {Array.<String>}
      */
     StyleRuleCache.prototype._id    = null;
@@ -109,7 +109,7 @@ define(function (require, exports, module) {
             tagName = idName.shift();
             idName = idName[0];
             
-            if (idName != null) {
+            if (idName) {
                 // Search true id. (Webkit style parser returns lowercase class name and id.)
                 idName = styleContent.match(new RegExp("#(" + idName + ").*{", "i"))[1];
                 self.addId(idName);
@@ -205,6 +205,11 @@ define(function (require, exports, module) {
     };
     
     /**
+     * Fetching
+     */
+    StyleRuleCache.prototype.fetch = function () {};
+    
+    /**
      * Clear cache
      */
     StyleRuleCache.prototype.clearCache = function () {
@@ -218,7 +223,9 @@ define(function (require, exports, module) {
     StyleRuleCache.prototype.dispose = function () {
         this._class = null;
         this._id = null;
+        
+        $(this).trigger("disposed");
     };
     
-    return (module.exports = StyleRuleCache);
+    return StyleRuleCache;
 });

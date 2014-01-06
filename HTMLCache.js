@@ -21,26 +21,20 @@ THE SOFTWARE.
 */
 
 /*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true,  regexp: true, indent: 4, maxerr: 50 */
-/*global define, brackets, $, document */
+/*global define, brackets, $ */
 define(function (require, exports, module) {
     "use strict";
     
-    var DocumentManager = brackets.getModule("document/DocumentManager"),
-        ElementLoader   = require("ElementLoader"),
+    var ElementLoader   = require("ElementLoader"),
+        FileUtils       = brackets.getModule("file/FileUtils"),
         ProjectManager  = brackets.getModule("project/ProjectManager"),
         StyleRuleCache  = require("StyleRuleCache");
 
     /**
      * @private
-     * @type {Object.<string, HTMLCache>}
-     */
-    var _instances      = {};
-
-    /**
-     * @private
      *
      * Resolve relative path.
-     * @param {string} filePath
+     * @param {String} filePath
      */
     function _resolvePath(filePath) {
         var stack = [];
@@ -57,43 +51,26 @@ define(function (require, exports, module) {
     }
     
     /**
-     * @private
-     *
-     * Watching file updates.
-     * @param {Document} doc
-     */
-    function _documentUpdateHandler(doc) {
-        var htmlCache = _instances[doc.file.fullPath];
-        
-        if (!!htmlCache && htmlCache.isDisposed === false) {
-            htmlCache.fetch();
-        }
-    }
-
-    /**
      * @constructor
+     * Roles
+     *  1. Parse and holding inner style rules.
+     *  2. Analysis of dependent CSS file.
+     *  3. Document update watching.
+     *      - Save to auto update object properties.
      *
-     * HTML cache for inner Style elements and dependencies.
      * Events
-     *      fetch - Fire on document fetched.
+     *      disposed - Fire on instance disposed.
+     *      fetchEnd - Fire on document fetched.
      *
-     * @param {Document} document
+     * @param {File} file File object
      */
-    function HTMLCache(document) {
-        if (!!_instances[document.file.fullPath]) {
-            var htmlCache = _instances[document.file.fullPath];
-            htmlCache.fetch();
-            return htmlCache;
-        }
-        
+    function HTMLCache(file) {
         StyleRuleCache.call(this);
         
-        this._document = document;
+        this._file = file;
         this._deps = [];
         
         this.fetch();
-        
-        _instances[this.fullPath] = this;
     }
     
     HTMLCache.prototype = Object.create(StyleRuleCache.prototype);
@@ -101,96 +78,103 @@ define(function (require, exports, module) {
     HTMLCache.prototype.parentClass = StyleRuleCache.prototype;
     
     Object.defineProperties(HTMLCache.prototype, {
-        "fullPath": {
-            get: function () { return this._document.file.fullPath; },
+        fullPath: {
+            get: function () { return this._file.fullPath; },
             set: function () {}
         },
-        "timestamp": {
-            get: function () { return this._document.diskTimestamp; },
+        timestamp: {
+            get: function () { return this._file._stat.mtime; },
             set: function () {}
         },
-        "depends": {
+        deps: {
             get: function () { return this._deps; },
             set: function () {}
         }
     });
     
     /**
-     * Assigned document.
-     * @type {Document}
+     * Assigned file.
+     * @type {File}
      */
-    HTMLCache.prototype._document   = null;
+    HTMLCache.prototype._file   = null;
     
     /**
-     * Dependence file paths (fullPath)
-     * @type {Array.<string>}
+     * Dependence CSS files
+     * @type {Array.<String>}
      */
-    HTMLCache.prototype._deps       = null;
+    HTMLCache.prototype._deps   = null;
+    
+    /**
+     * @type {Date}
+     */
+    HTMLCache.prototype._lastUpdateCheck = null;
     
     /**
      * @private
-     *
      * Survey dependent CSS files.
+     * @param {String} content
      */
-    HTMLCache.prototype._surveyDependent = function () {
-        var projectRoot = ProjectManager.getProjectRoot().fullPath,
-            docRoot     = this.fullPath.substr(0, this.fullPath.lastIndexOf("/") + 1),
-            depends     = [],
-            links       = this._getText().match(/<link .*[ ]?href=["|'](.+)["|'].*>/g) || [];
+    HTMLCache.prototype._surveyDependent = function (content) {
+        var self = this;
         
-        $.each(links, function () {
-            var link = $.parseHTML(this)[0],
-                path;
-
-            if (link.href.slice(-3).toLowerCase() === "css") {
-                path = link.getAttribute("href");
-
-                // when reference root, rewrite to ProjectRoot path
-                path = path[0] === "/" ? projectRoot + path : docRoot + path;
-                path = _resolvePath(path);
-                depends.push(path);
-            }
-        });
-
-        this._deps = depends;
-    };
-    
-    /**
-     * @private
-     *
-     * Construct cache.
-     */
-    HTMLCache.prototype._fetchRules = function () {
-        var self        = this,
-            document    = this._getText(),
-            styles      = document.match(/<style ?.*>[\s\S]*?<\/style>/gi) || [];
-        
-        if (!styles.length) { return; }
-        
-        styles = $.parseHTML(styles.join(""));
-        $.each(styles, function (index, style) {
-            var deferred = $.Deferred();
-            
-            // load style
-            ElementLoader.load(style, function () { deferred.resolve(this); });
-            
-            deferred.done(function (element) {
-                self.parseStyleRule(style.sheet.rules, style);
-                element.remove();
+        return $.Deferred(function () {
+            var projectRoot = ProjectManager.getProjectRoot().fullPath,
+                docRoot     = self.fullPath.substr(0, self.fullPath.lastIndexOf("/") + 1),
+                deps        = [],
+                links;
                 
-                $(self).triggerHandler("ruleFetched");
+            // Find style elements
+            links = content.match(/<link .*[ ]?href=["|'](.+)["|'].*>/g) || [];
+                
+            $.each(links, function () {
+                var link = $.parseHTML(this)[0],
+                    path;
+    
+                if (link.href.slice(-3).toLowerCase() === "css") {
+                    path = link.getAttribute("href");
+    
+                    // when reference root, rewrite to ProjectRoot path
+                    path = path[0] === "/" ? projectRoot + path : docRoot + path;
+                    path = _resolvePath(path);
+                    deps.push(path);
+                }
             });
+    
+            self._deps = deps;
+            
+            this.resolve();
         });
     };
     
     /**
      * @private
-     *
-     * Get HTML contents as text.
-     * @return {string}
+     * Construct cache.
+     * @param {String} content
      */
-    HTMLCache.prototype._getText = function () {
-        return this._document.getText();
+    HTMLCache.prototype._fetchRules = function (content) {
+        var self        = this;
+        
+        return $.Deferred(function () {
+            var styles  = content.match(/<style ?.*>[\s\S]*?<\/style>/gi) || [],
+                que     = [];
+            
+            if (!styles.length) { this.resolve(); }
+            
+            styles = $.parseHTML(styles.join(""));
+            $.each(styles, function (index, style) {
+                // load style
+                var loadDfd = ElementLoader.load(style)
+                    .done(function () {
+                        self.parseStyleRule(style.sheet.rules, style);
+                        style.remove();
+                    });
+                
+                que.push(loadDfd);
+            });
+            
+            $.when.apply(null, que)
+                .done(this.resolve.bind(this));
+        });
     };
     
     /**
@@ -199,12 +183,19 @@ define(function (require, exports, module) {
     HTMLCache.prototype.fetch = function () {
         var self = this;
         
-        $(this).one("ruleFetched", function () { $(self).triggerHandler("fetch"); });
-        
         this.clearCache();
         
-        this._surveyDependent();
-        this._fetchRules();
+        FileUtils.readAsText(this._file)
+            .then(function (content) {
+                return $.when(
+                    self._surveyDependent(content),
+                    self._fetchRules(content)
+                );
+            })
+            .done(function () {
+                self._lastUpdateCheck = new Date();
+                $(self).trigger("fetchEnd");
+            });
     };
     
     /**
@@ -219,16 +210,11 @@ define(function (require, exports, module) {
      * Dispose object
      */
     HTMLCache.prototype.dispose = function () {
-        delete _instances[this.fullPath];
-        
-        this._deps      = null;
-        this._document  = null;
-        
         this.parentClass.dispose.call(this);
+        
+        this._deps = null;
+        this._file = null;
     };
-    
-    // Listen document update events.
-    $(DocumentManager).on("documentSaved documentRefreshed", function (e, doc) { _documentUpdateHandler(doc); });
     
     return HTMLCache;
 });

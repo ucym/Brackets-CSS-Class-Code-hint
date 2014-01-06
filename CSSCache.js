@@ -21,7 +21,7 @@ THE SOFTWARE.
 */
 
 /*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true,  regexp: true, indent: 4, maxerr: 50 */
-/*global define, brackets, $, document, CSSStyleRule, setInterval */
+/*global define, brackets, $, document, setInterval */
 define(function (require, exports, module) {
     "use strict";
     
@@ -30,65 +30,28 @@ define(function (require, exports, module) {
         FileUtils       = brackets.getModule("file/FileUtils"),
         StyleRuleCache  = require("StyleRuleCache");
     
-    var CHECK_INTERVAL  = 20000;
+    var CHECK_INTERVAL  = 1000,
+        $checkTrigger    = $({});
     
-    /**
-     * @private
-     * @type {Object<string, CSSCache>}
-     */
-    var _instances      = {};
-    
-    /**
-     * @private
-     *
-     * Watching file updates.
-     * @param {Document} doc
-     */
-    function _documentUpdateHandler(doc) {
-        var cssCache = _instances[doc.file.fullPath];
-        
-        if (!!cssCache && cssCache === doc && cssCache.isDisposed === false) {
-            cssCache.fetch();
-        }
-    }
-    
-    /**
-     * @private
-     * 
-     * Watching file updates.
-     */
-    function _updateCheckerTimer() {
-        var date = Date.now();
-        
-        $.each(_instances, function () {
-            if (date - this.lastUpdateCheck >= CHECK_INTERVAL) {
-                this.clearCache();
-                this._fetch();
-            }
-        });
-    }
     
     /**
      * @constructor
+     * Roles
+     *  1. Parse and holding style rules (class name and id)
+     *  2. Document update watching.
+     *      - Periodic update check
+     *  3. Guarantee the unity of one instance for file.
      *
-     * CSS rules cache
+     * CSS rules cache.
      * @param {File} file
      */
     function CSSCache(file) {
-        if (!!_instances[file.fullPath]) {
-            var self = _instances[file.fullPath];
-            self._fetch();
-            
-            return _instances[file.fullPath];
-        }
-        
         StyleRuleCache.call(this);
         
-        this._file = file;
-        this.lastUpdateCheck = new Date();
-        this._fetch();
+        $checkTrigger.on("check", this._checkUpdate.bind(this));
         
-        _instances[file.fullPath] = this;
+        this._file = file;
+        this.fetch();
     }
     
     CSSCache.prototype = Object.create(StyleRuleCache.prototype);
@@ -113,11 +76,6 @@ define(function (require, exports, module) {
     CSSCache.prototype._file        = null;
     
     /**
-     * @type {String}
-     */
-    CSSCache.prototype.fullPath     = null;
-    
-    /**
      * @type {Date}
      */
     CSSCache.prototype.timestamp    = null;
@@ -125,7 +83,16 @@ define(function (require, exports, module) {
     /**
      * @type {Date}
      */
-    CSSCache.prototype.lastUpdateCheck = null;
+    CSSCache.prototype._lastUpdateCheck = null;
+    
+    CSSCache.prototype._checkUpdate = function () {
+        this._file.stat(function (err, stat) {
+            if (stat.mtime > this._lastUpdateCheck) {
+                this.fetch();
+                console.info("Detect updates: %s", this._file.fullPath);
+            }
+        }.bind(this));
+    };
     
     /**
      * Load CSS and Cache
@@ -133,34 +100,32 @@ define(function (require, exports, module) {
      * @private
      * @param {function()} callback
      */
-    CSSCache.prototype._fetch = function (callback) {
-        var self    = this,
-            onload  = $.Deferred();
+    CSSCache.prototype.fetch = function () {
+        var self    = this;
         
         // Read file contents
-        FileUtils
+        return FileUtils
             .readAsText(self._file)
-            .done(function (content) {
+            .then(function (content) {
                 var style = document.createElement("style");
                 style.innerHTML = content;
                 
-                ElementLoader.load(style, onload.resolve.bind(onload, style));
+                return ElementLoader.load(style);
+            })
+            // End read file then cache style rules
+            .done(function (style) {
+                self.parseStyleRule(style.sheet.rules, style);
+                
+                // clear dom element
+                style.remove();
+                
+                self._lastUpdateCheck = new Date();
             });
-        
-        // End read file then cache style rules
-        onload.done(function (style) {
-            self.parseStyleRule(style.sheet.rules, style);
-            
-            // clear dom element
-            style.remove();
-            
-            self.lastUpdateCheck = new Date();
-        });
     };
     
+    
     // Listen document update events.
-    $(DocumentManager).on("documentSaved documentRefreshed", function (e, doc) { _documentUpdateHandler(doc); });
-    setInterval(_updateCheckerTimer, CHECK_INTERVAL);
+    setInterval($.fn.trigger.bind($checkTrigger, "check"), CHECK_INTERVAL);
     
     return CSSCache;
 });

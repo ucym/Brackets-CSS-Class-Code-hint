@@ -30,7 +30,7 @@ define(function (require, exports, module) {
     var AppInit         = brackets.getModule("utils/AppInit"),
         CodeHintManager = brackets.getModule("editor/CodeHintManager"),
         HTMLUtils       = brackets.getModule("language/HTMLUtils"),
-        Cacher          = require("Cache");
+        CacheManager    = require("CacheManager");
     
     var _supports            = JSON.parse(require("text!support.json")).htmlAttrs;
     
@@ -126,7 +126,7 @@ define(function (require, exports, module) {
         }
         
         // search
-        candidate = Cacher.searchClass(this.editor.document, query, tagInfo.tagName, ignore);
+        candidate = CacheManager.searchClass(this.editor.document, query, tagInfo.tagName, ignore);
         
         // override brackets highlight
         var queryMathcer    = new RegExp("(" + query + ")", "i"),
@@ -142,7 +142,6 @@ define(function (require, exports, module) {
         
         return {
             hints: result,
-            //query: query,
             selectInitial: true
         };
     };
@@ -162,7 +161,7 @@ define(function (require, exports, module) {
         }
         
         return {
-            hints: Cacher.searchId(this.editor.document, query),
+            hints: CacheManager.searchId(this.editor.document, query),
             query: query,
             selectInitial: true
         };
