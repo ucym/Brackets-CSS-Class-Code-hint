@@ -328,8 +328,5 @@ define(function (require, exports, module) {
     // Listen document update event
     $(DocumentManager).on("documentSaved documentRefreshed", _documentUpdateHandler);
     
-    
-    window.cache = _instance;
-    
     return _instance;
 });
