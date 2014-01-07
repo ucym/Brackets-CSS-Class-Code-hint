@@ -107,15 +107,15 @@ define(function (require, exports, module) {
                 dfd.resolve(new Class(file), true);
             }
         })
-        .done(function (instance, isNew) {
-            if (isNew === false) { instance.fetch(); }
-            storage[instance.fullPath] = instance;
-            
-            $(instance).on("disposed", function () {
-                delete storage[instance.fullPath];
-            });
-        })
-        .promise();
+            .done(function (instance, isNew) {
+                if (isNew === false) { instance.fetch(); }
+                storage[instance.fullPath] = instance;
+                
+                $(instance).on("disposed", function () {
+                    delete storage[instance.fullPath];
+                });
+            })
+            .promise();
     };
     
     /**
@@ -256,6 +256,8 @@ define(function (require, exports, module) {
     function _projectOpenHandler() {
         var prjRoot     = ProjectManager.getProjectRoot(),
             cssFiles    = [];
+        
+        _instance._initialize();
         
         /**
          * Search css file from directory
