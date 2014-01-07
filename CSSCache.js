@@ -30,8 +30,8 @@ define(function (require, exports, module) {
         FileUtils       = brackets.getModule("file/FileUtils"),
         StyleRuleCache  = require("StyleRuleCache");
     
-    var CHECK_INTERVAL  = 1000,
-        $checkTrigger    = $({});
+    var CHECK_INTERVAL  = 20000,
+        $checkTrigger   = $({});
     
     
     /**
