@@ -20,10 +20,12 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-/*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true,  regexp: true, indent: 4, maxerr: 50 */
+/*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true, expr:true, regexp: true, indent: 4, maxerr: 50 */
 /*global define, $, CSSStyleRule */
 define(function (require, exports, module) {
     "use strict";
+    
+    var StringUtils = brackets.getModule("utils/StringUtils");
     
     /*
      * @constructor
@@ -110,8 +112,10 @@ define(function (require, exports, module) {
             idName = idName[0];
             
             if (idName) {
-                // Search true id. (Webkit style parser returns lowercase class name and id.)
-                idName = styleContent.match(new RegExp("#(" + idName + ").*{", "i"))[1];
+                // Search cased id. (Webkit style parser returns lowercase class name and id.)
+                idName = StringUtils.regexEscape(idName);
+                idName = styleContent.match(new RegExp("#(" + idName + ").*{", "i"));
+                idName && (idName = idName[1]);
                 self.addId(idName);
             }
 
@@ -119,8 +123,11 @@ define(function (require, exports, module) {
                 tagName = tagName === "*" ? "" : tagName || "";
                 
                 $.each(classNames, function (i, className) {
-                    // Seach true class name. (Webkit style parser returns lowercase class name and id.)
-                    className = styleContent.match(new RegExp("\\.(" + className + ").*{", "i"))[1];
+                    // Seach cased class name. (Webkit style parser returns lowercase class name and id.)
+                    className = StringUtils.regexEscape(className);
+                    className = styleContent.match(new RegExp("\\.(" + className + ").*{", "i"));
+                    className && (className = className[1]);
+                    
                     self.addClass(className, tagName);
                 });
             }
