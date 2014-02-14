@@ -174,7 +174,7 @@ define(function (require, exports, module) {
     StyleRuleCache.prototype.searchClass = function (query, tagName, ignore) {
         if (this.isDisposed) { return []; }
         
-        var matcher = new RegExp(query, "i"),
+        var matcher = new RegExp(StringUtils.regexEscape(query), "i"),
             result  = [];
         ignore = ignore || {};
         
