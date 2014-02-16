@@ -33,14 +33,11 @@ define(function (require, exports, module) {
     var CHECK_INTERVAL  = 20000,
         $checkTrigger   = $({});
     
-    
     /**
      * @constructor
      * Roles
      *  1. Parse and holding style rules (class name and id)
      *  2. Document update watching.
-     *      - Periodic update check
-     *  3. Guarantee the unity of one instance for file.
      *
      * CSS rules cache.
      * @param {File} file
@@ -92,7 +89,12 @@ define(function (require, exports, module) {
      */
     CSSCache.prototype._checkUpdate = function () {
         this._file.stat(function (err, stat) {
-            if (stat.mtime > this._lastUpdateCheck) {
+            if (err) {
+                if (err === "NotFound") return this.dispose();
+                return;
+            }
+            
+            if (!err && stat.mtime > this._lastUpdateCheck) {
                 console.info("Detect external changes: %s", this._file.fullPath);
                 this.fetch();
             }
@@ -100,8 +102,7 @@ define(function (require, exports, module) {
     };
     
     /**
-     * Load CSS and Cache
-     *
+     * Fetch and parse CSS
      * @private
      * @param {function()} callback
      */
