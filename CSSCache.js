@@ -89,7 +89,12 @@ define(function (require, exports, module) {
      */
     CSSCache.prototype._checkUpdate = function () {
         this._file.stat(function (err, stat) {
-            if (stat.mtime > this._lastUpdateCheck) {
+            if (err) {
+                if (err === "NotFound") return this.dispose();
+                return;
+            }
+            
+            if (!err && stat.mtime > this._lastUpdateCheck) {
                 console.info("Detect external changes: %s", this._file.fullPath);
                 this.fetch();
             }
