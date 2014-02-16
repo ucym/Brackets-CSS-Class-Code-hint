@@ -31,10 +31,8 @@ define(function (require, exports, module) {
         StyleRuleCache  = require("StyleRuleCache");
 
     /**
-     * @private
-     *
      * Resolve relative path.
-     * @param {String} filePath
+     * @param {string} filePath
      */
     function _resolvePath(filePath) {
         var stack = [];
@@ -56,7 +54,7 @@ define(function (require, exports, module) {
      *  1. Parse and holding inner style rules.
      *  2. Analysis of dependent CSS file.
      *  3. Document update watching.
-     *      - Save to auto update object properties.
+     *      - Save to auto update properties.
      *
      * Events
      *      disposed - Fire on instance disposed.
@@ -100,7 +98,7 @@ define(function (require, exports, module) {
     
     /**
      * Dependence CSS files
-     * @type {Array.<String>}
+     * @type {Array.<string>}
      */
     HTMLCache.prototype._deps   = null;
     
@@ -110,9 +108,9 @@ define(function (require, exports, module) {
     HTMLCache.prototype._lastUpdateCheck = null;
     
     /**
-     * @private
      * Survey dependent CSS files.
-     * @param {String} content
+     * @private
+     * @param {string} content
      */
     HTMLCache.prototype._surveyDependent = function (content) {
         var self = this;
@@ -147,9 +145,9 @@ define(function (require, exports, module) {
     };
     
     /**
-     * @private
      * Construct cache.
-     * @param {String} content
+     * @private
+     * @param {string} content
      */
     HTMLCache.prototype._fetchRules = function (content) {
         var self        = this;

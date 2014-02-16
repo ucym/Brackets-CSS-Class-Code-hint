@@ -27,7 +27,7 @@ define(function (require, exports, module) {
     
     var StringUtils = brackets.getModule("utils/StringUtils");
     
-    /*
+    /**
      * @constructor
      * 
      * Style rule caches.
@@ -46,13 +46,13 @@ define(function (require, exports, module) {
     
     /**
      * Class names.
-     * @type {Object.<String, Array.<String>>}
+     * @type {Object.<string, Array.<string>>}
      */
     StyleRuleCache.prototype._class = null;
     
     /**
-     * Id's.
-     * @type {Array.<String>}
+     * Ids
+     * @type {Array.<string>}
      */
     StyleRuleCache.prototype._id    = null;
     
@@ -133,8 +133,8 @@ define(function (require, exports, module) {
 
     /**
      * Add className to cache.
-     * @param {String} className
-     * @param {?String} tagName Class dependent tag name.
+     * @param {string} className
+     * @param {?string} tagName Class dependent tag name.
      */
     StyleRuleCache.prototype.addClass = function (className, tagName) {
         if (this.isDisposed) { return; }
@@ -153,7 +153,7 @@ define(function (require, exports, module) {
     
     /**
      * Add id to cache.
-     * @param {String} idName
+     * @param {string} idName
      */
     StyleRuleCache.prototype.addId = function (idName) {
         if (this.isDisposed) { return; }
@@ -165,11 +165,10 @@ define(function (require, exports, module) {
     
     /**
      * search query matched class
-     *
-     * @param {String} query
-     * @param {String} tagName
+     * @param {string} query
+     * @param {string} tagName
      * @param {Object.<string, boolean>} ignore ignore class names
-     * @return {Array.<String>} matched class names
+     * @return {Array.<string>} matched class names
      */
     StyleRuleCache.prototype.searchClass = function (query, tagName, ignore) {
         if (this.isDisposed) { return []; }
@@ -192,8 +191,8 @@ define(function (require, exports, module) {
     /**
      * Search query matched id
      *
-     * @param {String} query
-     * @return {Array.<String>} matched id's
+     * @param {string} query
+     * @return {Array.<string>} matched id's
      */
     StyleRuleCache.prototype.searchId = function (query) {
         if (this.isDisposed) { return []; }
