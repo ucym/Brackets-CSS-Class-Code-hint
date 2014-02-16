@@ -43,9 +43,8 @@ define(function (require, exports, module) {
     
     /**
      * @param {Editor} editor
-     * @param {String} implicitChar
-     *
-     * @return {Boolean}
+     * @param {string} implicitChar
+     * @return {boolean}
      */
     ClassHints.prototype.hasHints = function (editor) {
         this.editor = editor;
@@ -64,8 +63,8 @@ define(function (require, exports, module) {
     };
     
     /**
-     * @param {String} implicitChar
-     * @return {(Object + jQuery.Deferred)<hints: Array<(String + jQuery.Obj)>, match: String, selectInitial: Boolean>}
+     * @param {string} implicitChar
+     * @return {Object.<string, Object>}
      */
     ClassHints.prototype.getHints = function () {
         var tagInfo     = HTMLUtils.getTagInfo(this.editor, this.editor.getCursorPos()),
@@ -86,9 +85,8 @@ define(function (require, exports, module) {
     
     /**
      * Get hints for class attribute
-     *
      * @param {TagInfo} tagInfo
-     * @return {(Object + jQuery.Deferred)<hints: Array<(String + jQuery.Obj)>, match: String, selectInitial: Boolean>}
+     * @return {Object.<string, Object>}
      */
     ClassHints.prototype._getClassHints = function (tagInfo) {
         var attrValue   = tagInfo.attr.value,
@@ -150,9 +148,8 @@ define(function (require, exports, module) {
     
     /**
      * Get hints for id attribute
-     *
      * @param {TagInfo} tagInfo
-     * @return {(Object + jQuery.Deferred)<hints: Array<(String + jQuery.Obj)>, match: String, selectInitial: Boolean>}
+     * @return {Object.<string, Object>}
      */
     ClassHints.prototype._getIdHints = function (tagInfo) {
         var attrValue   = tagInfo.attr.value,
@@ -171,7 +168,7 @@ define(function (require, exports, module) {
     
     
     /**
-     * @param {String} completion
+     * @param {string} completion
      */
     ClassHints.prototype.insertHint = function (completion) {
         var cursor      = this.editor.getCursorPos(),
@@ -188,11 +185,9 @@ define(function (require, exports, module) {
     };
     
     /**
-     * 
-     * @param {String} completion
+     * @param {string} completion
      * @param {{line:Number, ch:Number}} cursor
      * @param {TagInfo} tagInfo
-     * @return {void}
      */
     ClassHints.prototype._insertClassHint = function (completion, cursor, tagInfo) {
         var start       = {line: cursor.line, ch: -1},
@@ -236,6 +231,11 @@ define(function (require, exports, module) {
         this.editor.setCursorPos(start.line, start.ch + completion.length - quoteAppended);
     };
     
+    /**
+     * @param {string} completion
+     * @param {{line:Number, ch:Number}} cursor
+     * @param {TagInfo} tagInfo
+     */
     ClassHints.prototype._insertIdHint = function (completion, cursor, tagInfo) {
         var start       = {line: -1, ch: -1},
             end         = {line: -1, ch: -1},

@@ -43,8 +43,7 @@ define(function (require, exports, module) {
      * Roles
      *  1. Search CSS className or ID from cache.
      *      - Search by considering the dependency of HTML and CSS.
-     *      - Access from "main.js" to method "searchId" or "searchClass".
-     *  2. StyleRuleCache construction from CSS or HTML
+     *  2. StyleRuleCache construction
      *      - Preload project contains css.
      *      - Load HTML dependencies CSS on outside of project dir.
      *      - Construct cache on project change and active editor change.
@@ -82,7 +81,28 @@ define(function (require, exports, module) {
     };
     
     /**
-     * @param {File|String} file
+     * Search StyleRuleCache Object from full path.
+     * @param {string}
+     * @return {StyleRuleCache}
+     */
+    CacheManager.prototype._searchCache = function (filePath) {
+        return this._HTMLCaches[filePath] || this._CSSCaches[filePath];
+    };
+    
+    /**
+     * Remove and dispoce cache object from full path.
+     * @param {string} filePath
+     */
+    CacheManager.prototype._removeCache = function(filePath) {
+        var cache = this._HTMLCaches[filePath] || this._CSSCaches[filePath];
+        cache.dispose();
+        
+        delete this._HTMLCaches[filePath];
+        delete this._CSSCaches[filePath];
+    };
+    
+    /**
+     * @param {File|string} file
      * @param {Object} storage
      * @param {function(File):Object} Class
      * @return {$.Deferred} done arguments (ClassInstance:Class, isNew:boolean)
@@ -120,28 +140,8 @@ define(function (require, exports, module) {
     };
     
     /**
-     * @param {String}
-     * @return {StyleRuleCache}
-     */
-    CacheManager.prototype._searchCache = function (filePath) {
-        return this._HTMLCaches[filePath] || this._CSSCaches[filePath];
-    };
-    
-    /**
-     * @param {string} filePath
-     */
-    CacheManager.prototype._removeCache = function(filePath) {
-        var cache = this._HTMLCaches[filePath] || this._CSSCaches[filePath];
-        cache.dispose();
-        
-        delete this._HTMLCaches[filePath];
-        delete this._CSSCaches[filePath];
-    };
-    
-    /**
-     * Construct and Add HTMLCache.
-     *
-     * @param {String|File} file
+     * Construct HTMLCache.
+     * @param {string|File} file
      * @param {Document} document
      */
     CacheManager.prototype.createHTMLCache = function (file) {
@@ -162,8 +162,8 @@ define(function (require, exports, module) {
     };
     
     /**
-     * Cache css file
-     * @param {String|File} file
+     * Construct CSSCache
+     * @param {string|File} file
      */
     CacheManager.prototype.createCSSCache = function (file) {
         this._createCache(file, this._CSSCaches, CSSCache)
@@ -176,7 +176,6 @@ define(function (require, exports, module) {
     
     /**
      * Search the class name associated with the HTML from all cache.
-     *
      * @param {Document} document
      * @param {string} query
      * @param {string} tagName
@@ -227,9 +226,8 @@ define(function (require, exports, module) {
     
     /**
      * Search the id associated with theHTML from all caches.
-     *
      * @param {Document} document
-     * @param {String} query
+     * @param {string} query
      */
     CacheManager.prototype.searchId = function (document, query) {
         var Arr         = Array.prototype,
@@ -258,11 +256,7 @@ define(function (require, exports, module) {
         return matches;
     };
     
-    // construct
-    _instance = new CacheManager();
-    
     /**
-     * Project Refresh/Change handler
      * Preload CSS file in the project dir.
      */
     function _projectOpenHandler() {
@@ -311,6 +305,8 @@ define(function (require, exports, module) {
     }
     
     /**
+     * Analysis opened HTML
+     * @param {$.Event} e  Event
      * @param {Editor} editor  Activated editor
      */
     function _editorChangeHandler(e, editor) {
@@ -320,6 +316,8 @@ define(function (require, exports, module) {
     }
     
     /**
+     * Update cache on document update
+     * @param {$.Event} e  Event
      * @param {Document} document
      */
     function _documentUpdateHandler(e, document) {
@@ -331,7 +329,7 @@ define(function (require, exports, module) {
     }
     
     /**
-     * New CSS Detection
+     * New CSS detection and construction cache.
      * @param {File|Directory} change
      * @param {Array.<File|Directory>} added
      * @param {Arrau.<File|Directoru>} removed
@@ -354,6 +352,7 @@ define(function (require, exports, module) {
         }
     }
     
+    
     // Listen editor change event for HTMLParse and Caching.
     //_instance.__editorChange(EditorManager.getActiveEditor());
     $(EditorManager).on("activeEditorChange", _editorChangeHandler);
@@ -366,6 +365,9 @@ define(function (require, exports, module) {
     
     // Listen FileSystem change event
     FileSystem.on("change", _fsChangeHandler);
+    
+    // construct
+    _instance = new CacheManager();
     
     return _instance;
 });
