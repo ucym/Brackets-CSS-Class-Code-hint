@@ -337,7 +337,6 @@ define(function (require, exports, module) {
      * @param {Arrau.<File|Directoru>} removed
      */
     function _fsChangeHandler(e, change, added, removed) {
-        console.info(arguments, change.isDirectory);
         var filterOnlyCSS = function (entry) { return entry.isFile && cssExt.test(entry.name); };
         
         if (change.isDirectory) {
