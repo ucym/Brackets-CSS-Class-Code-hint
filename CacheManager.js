@@ -34,7 +34,8 @@ define(function (require, exports, module) {
         HTMLCache       = require("HTMLCache"),
         ProjectManager  = brackets.getModule("project/ProjectManager");
     
-    var _instance      = null;
+    var _instance      = null,
+        cssExt         = /\.css/i;
 
     /**
      * @constructor
@@ -124,6 +125,17 @@ define(function (require, exports, module) {
      */
     CacheManager.prototype._searchCache = function (filePath) {
         return this._HTMLCaches[filePath] || this._CSSCaches[filePath];
+    };
+    
+    /**
+     * @param {string} filePath
+     */
+    CacheManager.prototype._removeCache = function(filePath) {
+        var cache = this._HTMLCaches[filePath] || this._CSSCaches[filePath];
+        cache.dispose();
+        
+        delete this._HTMLCaches[filePath];
+        delete this._CSSCaches[filePath];
     };
     
     /**
@@ -270,7 +282,7 @@ define(function (require, exports, module) {
             // get Directory content.
             dir.getContents(function (err, entries) {
                 $.each(entries, function (index, entry) {
-                    if (entry.isFile && (/.+\.css$/).test(entry.name)) {
+                    if (entry.isFile && cssExt.test(entry.name)) {
                         // if file is css, add CSS file list
                         cssFiles.push(entry);
                     }
@@ -318,6 +330,31 @@ define(function (require, exports, module) {
         }
     }
     
+    /**
+     * New CSS Detection
+     * @param {File|Directory} change
+     * @param {Array.<File|Directory>} added
+     * @param {Arrau.<File|Directoru>} removed
+     */
+    function _fsChangeHandler(e, change, added, removed) {
+        console.info(arguments, change.isDirectory);
+        var filterOnlyCSS = function (entry) { return entry.isFile && cssExt.test(entry.name); };
+        
+        if (change.isDirectory) {
+            added = added.filter(filterOnlyCSS);
+            removed = removed.filter(filterOnlyCSS);
+            
+            $.each(added, function () {
+                _instance.createCSSCache(this);
+                console.log("new css detected: %c%s", "color:blue", this.name);
+            });
+            $.each(removed, function () {
+                _instance._removeCache(this.fullPath);
+                console.log("css file removed: %c%s", "color:red", this.name);
+            });
+        }
+    }
+    
     // Listen editor change event for HTMLParse and Caching.
     //_instance.__editorChange(EditorManager.getActiveEditor());
     $(EditorManager).on("activeEditorChange", _editorChangeHandler);
@@ -327,6 +364,9 @@ define(function (require, exports, module) {
     
     // Listen document update event
     $(DocumentManager).on("documentSaved documentRefreshed", _documentUpdateHandler);
+    
+    // Listen FileSystem change event
+    FileSystem.on("change", _fsChangeHandler);
     
     return _instance;
 });
