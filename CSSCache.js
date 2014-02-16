@@ -48,7 +48,9 @@ define(function (require, exports, module) {
     function CSSCache(file) {
         StyleRuleCache.call(this);
         
-        $checkTrigger.on("check", this._checkUpdate.bind(this));
+        // Check external changes
+        this._checkUpdate = this._checkUpdate.bind(this);
+        $checkTrigger.on("check", this._checkUpdate);
         
         this._file = file;
         this.fetch();
@@ -85,11 +87,14 @@ define(function (require, exports, module) {
      */
     CSSCache.prototype._lastUpdateCheck = null;
     
+    /**
+     * Check external changes
+     */
     CSSCache.prototype._checkUpdate = function () {
         this._file.stat(function (err, stat) {
             if (stat.mtime > this._lastUpdateCheck) {
+                console.info("Detect external changes: %s", this._file.fullPath);
                 this.fetch();
-                console.info("Detect updates: %s", this._file.fullPath);
             }
         }.bind(this));
     };
@@ -123,8 +128,17 @@ define(function (require, exports, module) {
             });
     };
     
+    /**
+     * Dispose object
+     */
+    CSSCache.prototype.dispose = function () {
+        this.parentClass.dispose.call(this);
+        
+        $checkTrigger.off("check", this._checkUpdate);
+    };
     
-    // Listen document update events.
+    
+    // Check external changes periodically.
     setInterval($.fn.trigger.bind($checkTrigger, "check"), CHECK_INTERVAL);
     
     return CSSCache;
