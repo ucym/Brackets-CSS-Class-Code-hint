@@ -140,6 +140,8 @@ define(function (require, exports, module) {
         $.each(candidate.specific, function () { result.push(highlight(this, tagInfo.tagName)); });
         $.each(candidate.general, function () { result.push(highlight(this, "*")); });
         
+        result = result.filter(function (obj, index) { return index < 200; });
+        
         return {
             hints: result,
             selectInitial: true
