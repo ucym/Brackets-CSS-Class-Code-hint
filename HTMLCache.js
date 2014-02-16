@@ -161,16 +161,17 @@ define(function (require, exports, module) {
             if (!styles.length) { this.resolve(); }
             
             styles = $.parseHTML(styles.join(""));
-            $.each(styles, function (index, style) {
-                // load style
-                var loadDfd = ElementLoader.load(style)
-                    .done(function () {
-                        self.parseStyleRule(style.sheet.rules, style);
-                        style.remove();
-                    });
-                
-                que.push(loadDfd);
-            });
+            styles &&
+                $.each(styles, function (index, style) {
+                    // load style
+                    var loadDfd = ElementLoader.load(style)
+                        .done(function () {
+                            self.parseStyleRule(style.sheet.rules, style);
+                            style.remove();
+                        });
+
+                    que.push(loadDfd);
+                });
             
             $.when.apply(null, que)
                 .done(this.resolve.bind(this));

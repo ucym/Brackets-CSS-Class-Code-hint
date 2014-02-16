@@ -115,8 +115,7 @@ define(function (require, exports, module) {
                 // Search cased id. (Webkit style parser returns lowercase class name and id.)
                 idName = StringUtils.regexEscape(idName);
                 idName = styleContent.match(new RegExp("#(" + idName + ").*{", "i"));
-                idName && (idName = idName[1]);
-                self.addId(idName);
+                idName && self.addId(idName[1]);
             }
 
             if (classNames.length) {
@@ -126,9 +125,7 @@ define(function (require, exports, module) {
                     // Seach cased class name. (Webkit style parser returns lowercase class name and id.)
                     className = StringUtils.regexEscape(className);
                     className = styleContent.match(new RegExp("\\.(" + className + ").*{", "i"));
-                    className && (className = className[1]);
-                    
-                    self.addClass(className, tagName);
+                    className && self.addClass(className[1], tagName);
                 });
             }
         });
@@ -177,7 +174,7 @@ define(function (require, exports, module) {
     StyleRuleCache.prototype.searchClass = function (query, tagName, ignore) {
         if (this.isDisposed) { return []; }
         
-        var matcher = new RegExp(query, "i"),
+        var matcher = new RegExp(StringUtils.regexEscape(query), "i"),
             result  = [];
         ignore = ignore || {};
         
