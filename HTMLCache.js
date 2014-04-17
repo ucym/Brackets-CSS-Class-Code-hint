@@ -130,11 +130,13 @@ define(function (require, exports, module) {
     
                 if (link.href.slice(-3).toLowerCase() === "css") {
                     path = link.getAttribute("href");
-    
-                    // when reference root, rewrite to ProjectRoot path
-                    path = path[0] === "/" ? projectRoot + path : docRoot + path;
-                    path = _resolvePath(path);
-                    deps.push(path);
+                    
+                    if (path.indexOf("http") !== 0) {
+                        // when reference root, rewrite to ProjectRoot path
+                        path = path[0] === "/" ? projectRoot + path : docRoot + path;
+                        path = _resolvePath(path);
+                        deps.push(path);
+                    }
                 }
             });
     
