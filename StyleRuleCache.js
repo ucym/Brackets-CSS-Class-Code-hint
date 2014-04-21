@@ -20,8 +20,8 @@ OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 THE SOFTWARE.
 */
 
-/*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true, expr:true, regexp: true, indent: 4, maxerr: 50 */
-/*global define, $, CSSStyleRule */
+/*jslint vars: true, plusplus: true, eqeq: true, devel: true, nomen: true, expr:true, regexp: true, indent: 4, maxerr: 50, eqnull: true*/
+/*global define, $, CSSStyleRule, brackets */
 define(function (require, exports, module) {
     "use strict";
     
@@ -70,13 +70,20 @@ define(function (require, exports, module) {
         if (this.isDisposed) { return; }
         
         var self        = this,
-            Arr         = Array.prototype,
             styleContent = style.innerText;
         
         // Filter only style rules.
-        var styleRules;
-        styleRules = Arr.filter.call(rules, function (rule) {
-            return rule.type === CSSStyleRule.prototype.STYLE_RULE;
+        var styleRules = [];
+        $.each(rules, function (i, rule) {
+            switch (rule.type) {
+                case CSSStyleRule.prototype.MEDIA_RULE:
+                    styleRules.push.apply(styleRules, rule.cssRules);
+                    break;
+
+                case CSSStyleRule.prototype.STYLE_RULE:
+                    styleRules.push(rule);
+                    break;
+            }
         });
 
         // separate comma
