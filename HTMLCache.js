@@ -30,6 +30,8 @@ define(function (require, exports, module) {
         ProjectManager  = brackets.getModule("project/ProjectManager"),
         StyleRuleCache  = require("StyleRuleCache");
 
+    var EXTERNAL_LINK = /^(?:http:|https:)\/\//i;
+
     /**
      * Resolve relative path.
      * @param {string} filePath
@@ -131,7 +133,7 @@ define(function (require, exports, module) {
                 if (link.href.slice(-3).toLowerCase() === "css") {
                     path = link.getAttribute("href");
                     
-                    if (path.indexOf("http") !== 0) {
+                    if (EXTERNAL_LINK.test(path) === false) {
                         // when reference root, rewrite to ProjectRoot path
                         path = path[0] === "/" ? projectRoot + path : docRoot + path;
                         path = _resolvePath(path);
@@ -161,7 +163,7 @@ define(function (require, exports, module) {
             if (!styles.length) { this.resolve(); }
             
             styles = $.parseHTML(styles.join(""));
-            styles &&
+            if (styles) {
                 $.each(styles, function (index, style) {
                     // load style
                     var loadDfd = ElementLoader.load(style)
@@ -172,6 +174,7 @@ define(function (require, exports, module) {
 
                     que.push(loadDfd);
                 });
+            }
             
             $.when.apply(null, que)
                 .done(this.resolve.bind(this));
