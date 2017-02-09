@@ -121,7 +121,7 @@ define(function (require, exports, module) {
             if (idName) {
                 // Search cased id. (Webkit style parser returns lowercase class name and id.)
                 idName = StringUtils.regexEscape(idName);
-                idName = styleContent.match(new RegExp("#(" + idName + ").*{", "i"));
+                idName = styleContent.match(new RegExp("#(" + idName + ")[^}]*{", "i"));
                 idName && self.addId(idName[1]);
             }
 
@@ -131,7 +131,7 @@ define(function (require, exports, module) {
                 $.each(classNames, function (i, className) {
                     // Seach cased class name. (Webkit style parser returns lowercase class name and id.)
                     className = StringUtils.regexEscape(className);
-                    className = styleContent.match(new RegExp("\\.(" + className + ").*{", "i"));
+                    className = styleContent.match(new RegExp("\\.(" + className + ")[^{]*{", "i"));
                     className && self.addClass(className[1], tagName);
                 });
             }
