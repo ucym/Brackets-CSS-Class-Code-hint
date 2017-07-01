@@ -137,7 +137,6 @@ define(function (require, exports, module) {
                         // when reference root, rewrite to ProjectRoot path
                         path = path[0] === "/" ? projectRoot.slice(0,-1) + path : docRoot + path;
                         path = _resolvePath(path);
-                        console.log(path);
                         deps.push(path);
                     }
                 }
