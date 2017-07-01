@@ -135,7 +135,7 @@ define(function (require, exports, module) {
                     
                     if (EXTERNAL_LINK.test(path) === false) {
                         // when reference root, rewrite to ProjectRoot path
-                        path = path[0] === "/" ? projectRoot + path : docRoot + path;
+                        path = path[0] === "/" ? projectRoot.slice(0,-1) + path : docRoot + path;
                         path = _resolvePath(path);
                         deps.push(path);
                     }
